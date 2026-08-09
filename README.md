@@ -16,19 +16,13 @@ habit that automatically produces a shared, searchable, growing resource.
 
 ## How It Works
 
-Intern learns something
-↓
-Writes a structured page (What I Learned / Key Concepts / Mistakes / References)
-↓
-Sets page Status → "Draft"
-↓
-Automation (n8n) detects the change
-↓
-AI (Gemini) generates: TLDR, FAQs, Quiz, Related Topics, Suggested Next Learning
-↓
-Page is updated automatically, Status → "Enriched"
-↓
-Wiki grows, page by page, intern by intern
+1. Intern learns something
+2. Writes a structured page (What I Learned / Key Concepts / Mistakes / References)
+3. Sets the page's Status to "Draft"
+4. Automation (n8n) detects the change
+5. AI (Gemini) generates: TLDR, FAQs, Quiz, Related Topics, Suggested Next Learning
+6. Page is updated automatically, Status flips to "Enriched"
+7. The wiki grows, page by page, intern by intern
 
 ## Tech Stack
 
