@@ -1,0 +1,348 @@
+{
+  "name": "wiki enrichment - manual build copy - new account",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "event": "pagedUpdatedInDatabase",
+        "databaseId": {
+          "__rl": true,
+          "value": "39d22ac1-7a6a-808e-b913-d611084b4fcb",
+          "mode": "list",
+          "cachedResultName": "39d22ac1-7a6a-808e-b913-d611084b4fcb",
+          "cachedResultUrl": "https://app.notion.com/p/39d22ac17a6a808eb913d611084b4fcb"
+        }
+      },
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        16
+      ],
+      "id": "61a49519-ad49-4a80-9023-2da1dae8eb6a",
+      "name": "Notion Trigger",
+      "credentials": {
+        "notionApi": {
+          "id": "APGB4Uu2aLP8vKiq",
+          "name": "Notion personal account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fc6c35d7-3a92-479e-84a0-4b78e556e8f4",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Draft",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -656,
+        16
+      ],
+      "id": "209fa130-6c9e-46ce-829c-f5a03641e9af",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "39d22ac1-7a6a-808e-b913-d611084b4fcb",
+          "mode": "list",
+          "cachedResultName": "39d22ac1-7a6a-808e-b913-d611084b4fcb",
+          "cachedResultUrl": "https://app.notion.com/p/39d22ac17a6a808eb913d611084b4fcb"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        0
+      ],
+      "id": "b463b929-44c1-4bba-bece-cf432485355a",
+      "name": "Get many database pages",
+      "credentials": {
+        "notionApi": {
+          "id": "APGB4Uu2aLP8vKiq",
+          "name": "Notion personal account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AQ.Ab8RN6LLMniG5xJnT8MxZhEcamElSY_wInGyV7czlGT2MPysOg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.prompt }] }] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -144,
+        0
+      ],
+      "id": "c06c030f-87ac-45d8-89e2-d16aee3ec864",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the triggered page (from the IF node, via Notion Trigger)\nconst triggeredPage = $('If').item.json;\n\n// Get all pages (from Get many database pages)\nconst allPages = $input.all();\n\n// Build list of other topic titles, excluding current page\nconst otherTitles = allPages\n  .map(item => item.json.property_name)\n  .filter(title => title && title !== triggeredPage.Name);\n\nconst prompt = `You are helping build an internal engineering wiki. Below is a page written by an intern documenting something they learned.\n\nGenerate the following, based ONLY on the content provided:\n\n1. TLDR: 2-3 sentence summary\n2. FAQs: 3-5 likely questions with concise answers\n3. Quiz: 3-5 questions to test retention, with answers\n4. Related Topics: from this list of existing topics: ${JSON.stringify(otherTitles)}, pick any that are meaningfully related. Return empty list if none are.\n5. Suggested Next Learning: 2-3 topics a learner should study next\n\nReturn ONLY valid JSON, no other text, in this structure:\n{\n  \"tldr\": \"\",\n  \"faqs\": [{\"q\": \"\", \"a\": \"\"}],\n  \"quiz\": [{\"question\": \"\", \"answer\": \"\"}],\n  \"related_topics\": [],\n  \"next_learning\": []\n}\n\nPAGE CONTENT:\n${triggeredPage.Content}`;\n\nreturn [{ json: { prompt, pageId: triggeredPage.id, pageName: triggeredPage.Name } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "21c5637e-3c30-45d9-a553-46cbe3238453",
+      "name": "Build Prompt"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nlet rawText = response.candidates[0].content.parts[0].text;\nrawText = rawText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n\nlet parsed;\nlet success = true;\n\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  success = false;\n  parsed = null;\n}\n\n// Build human-readable formatted text versions\nlet faqsFormatted = '';\nlet quizFormatted = '';\nlet relatedFormatted = '';\nlet nextLearningFormatted = '';\n\nif (success && parsed) {\n  faqsFormatted = parsed.faqs\n    .map(item => `Q: ${item.q}\\nA: ${item.a}`)\n    .join('\\n\\n');\n\n  quizFormatted = parsed.quiz\n    .map((item, i) => `${i + 1}. ${item.question}\\nAnswer: ${item.answer}`)\n    .join('\\n\\n');\n\n  relatedFormatted = parsed.related_topics.length > 0\n    ? parsed.related_topics.join(', ')\n    : 'None yet';\n\n  nextLearningFormatted = parsed.next_learning\n    .map(item => `• ${item}`)\n    .join('\\n');\n}\n\nreturn [{\n  json: {\n    success,\n    parsed,\n    faqsFormatted,\n    quizFormatted,\n    relatedFormatted,\n    nextLearningFormatted,\n    pageId: $('Build Prompt').item.json.pageId,\n    pageName: $('Build Prompt').item.json.pageName\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        0
+      ],
+      "id": "2d97b58f-bc1d-4ef5-872f-912be5bd27c2",
+      "name": "Parse Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d41d0a1a-bf49-4eea-8b1c-20ae02c511a8",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        160,
+        0
+      ],
+      "id": "926d1631-0770-4860-a964-9f8a89c09b1d",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Parse Response').item.json.pageId }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "TLDR|rich_text",
+              "textContent": "={{ $json.parsed.tldr }}"
+            },
+            {
+              "key": "FAQs|rich_text",
+              "textContent": "={{ $json.faqsFormatted }}"
+            },
+            {
+              "key": "Quiz|rich_text",
+              "textContent": "={{ $json.quizFormatted }}"
+            },
+            {
+              "key": "Related Topics|rich_text",
+              "textContent": "={{ $json.relatedFormatted }}"
+            },
+            {
+              "key": "Next Learning|rich_text",
+              "textContent": "={{ $json.nextLearningFormatted }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -112
+      ],
+      "id": "a8cae833-9d2b-49f1-a996-e5b627e813df",
+      "name": "Update a database page",
+      "credentials": {
+        "notionApi": {
+          "id": "APGB4Uu2aLP8vKiq",
+          "name": "Notion personal account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        320,
+        80
+      ],
+      "id": "f1cf418c-dea8-419e-a8d0-2c8b6766aa41",
+      "name": "No Operation, do nothing"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Notion Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get many database pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many database pages": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Update a database page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e0d8d141-2c92-44e3-8284-ae47bed9a6da",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3e91da070f4697c4dfdd863b716fa6e9a4d9e445180b0f63d70e40d94c2411f1"
+  },
+  "nodeGroups": [],
+  "id": "yzKX6djN7GcClHR6",
+  "tags": []
+}
