@@ -50,7 +50,7 @@ habit that automatically produces a shared, searchable, growing resource.
 1. **Notion Trigger** — polls the database for updated pages every minute
 2. **IF: Status is Draft** — only proceeds for pages ready to be enriched
 3. **Get many database pages** — fetches all existing page titles, used to ground "Related Topics" so the AI can't invent connections to pages that don't exist
-4. **Build Prompt** (Code node) — assembles the enrichment prompt from the page content + existing topic list (see [`prompts/claude-enrichment-prompt.md`](prompts/enrichment-prompt.md))
+4. **Build Prompt** (Code node) — assembles the enrichment prompt from the page content + existing topic list (see [`prompts/enrichment-prompt.md`](prompts/enrichment-prompt.md))
 5. **HTTP Request** — calls the Gemini API
 6. **Parse Response** (Code node) — parses the model's JSON output and formats it into clean, human-readable text
 7. **IF: Parsed OK?** — only proceeds if the AI's response was valid JSON, to avoid ever writing broken data into Notion
